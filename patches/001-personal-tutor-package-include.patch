@@ -1,0 +1,55 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: PersonalTutor <personal-tutor@example.local>
+Date: Thu, 1 Jan 2026 00:00:00 +0000
+Subject: [PATCH] build: include personal_tutor package in setuptools discovery
+
+This is the *only* change PersonalTutor makes to an upstream DeepTutor
+source tree. It adds `personal_tutor*` to the editable-install discovery
+list and ships its bundled YAML/MD data, so that `pip install -e .` also
+installs PersonalTutor and it becomes importable from any working
+directory (not just the project root).
+
+Why a patch (not a separate pyproject)?
+---------------------------------------
+The upstream capability registry imports `deeptutor.plugins.loader`
+lazily, and that shim re-exports from `personal_tutor.plugins`. For the
+shim to resolve, `personal_tutor` must be on `sys.path` regardless of the
+current working directory — which requires it to be an installed package.
+A single-line addition to the existing `[tool.setuptools.packages.find]
+include` array plus its `package-data` entry is the minimal, idiomatic
+way to achieve this; maintaining a second build file would fight the
+single editable install the rest of the repo assumes.
+
+Rebase notes
+------------
+On conflict, re-apply by ensuring `personal_tutor*` is present in the
+`include` array under `[tool.setuptools.packages.find]` and that a
+`personal_tutor = [...]` entry exists under `[tool.setuptools.package-data]`.
+These two hunks are the entire surface of this patch.
+
+Apply with:  git am patches/001-personal-tutor-package-include.patch
+---
+ pyproject.toml | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/pyproject.toml b/pyproject.toml
+index 1111111..2222222 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -208,7 +208,7 @@ version = {attr = "deeptutor.__version__.__version__"}
+ 
+ [tool.setuptools.packages.find]
+ where = ["."]
+-include = ["deeptutor*", "deeptutor_cli*"]
++include = ["deeptutor*", "deeptutor_cli*", "personal_tutor*"]
+ 
+ [tool.setuptools.package-data]
+ # Runtime data shipped inside the deeptutor package: prompt YAMLs (loaded by
+@@ -226,3 +226,5 @@ deeptutor = [
+ deeptutor_cli = ["**/*.md"]
+ deeptutor_web = ["**/*", ".next/**/*"]
++# PersonalTutor ships domain knowledge graphs as YAML and spec/README markdown;
++# importlib.resources.files() reads these at runtime so they must be packaged.
++personal_tutor = ["**/*.yaml", "**/*.yml", "**/*.md"]
+-- 
+2.45.0

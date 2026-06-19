@@ -422,6 +422,18 @@ app.include_router(unified_ws.router, prefix="/api/v1", tags=["unified-ws"])
 app.include_router(quiz_judge.router, prefix="/api/v1", tags=["quiz-judge"])
 
 
+# PersonalTutor extension router. Mounted best-effort so a PersonalTutor import
+# failure degrades gracefully (endpoints absent, upstream API still boots).
+try:
+    from personal_tutor.api.router import router as _personal_tutor_router
+
+    app.include_router(
+        _personal_tutor_router, prefix="/api/v1/personal", tags=["personal-tutor"]
+    )
+except Exception as _pt_exc:  # pragma: no cover
+    logging.getLogger(__name__).warning("PersonalTutor router not mounted: %s", _pt_exc)
+
+
 @app.get("/")
 async def root():
     return {"message": "Welcome to DeepTutor API"}

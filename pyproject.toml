@@ -208,7 +208,7 @@ version = {attr = "deeptutor.__version__.__version__"}
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["deeptutor*", "deeptutor_cli*"]
+include = ["deeptutor*", "deeptutor_cli*", "personal_tutor*"]
 
 [tool.setuptools.package-data]
 # Runtime data shipped inside the deeptutor package: prompt YAMLs (loaded by
@@ -227,6 +227,9 @@ deeptutor = [
 ]
 deeptutor_cli = ["**/*.md"]
 deeptutor_web = ["**/*", ".next/**/*"]
+# PersonalTutor ships domain knowledge graphs as YAML and spec/README markdown;
+# importlib.resources.files() reads these at runtime so they must be packaged.
+personal_tutor = ["**/*.yaml", "**/*.yml", "**/*.md"]
 
 # ============================================
 # Black code formatter configuration

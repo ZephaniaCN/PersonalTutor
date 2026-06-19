@@ -1,0 +1,184 @@
+# Programming Algorithms — knowledge graph
+#
+# This is the seed graph for PersonalTutor's first domain. It is intentionally
+# not exhaustive: the goal is a credible, acyclic DAG that exercises the
+# roadmap planner (prerequisites), the diagnostic sampler, and both CONCEPT
+# and CODE question types.
+#
+# Adding a knowledge point later is a one-line edit here — no code change.
+# Keep ids namespaced (``<area>.<topic>.<leaf>``) so they stay unique and
+# readable in API/storage payloads.
+
+domain_id: programming
+name: 编程算法
+description: 数据结构、经典算法与复杂度分析,覆盖 LeetCode 中等难度核心题型。
+
+modules:
+  - id: ds
+    name: 数据结构基础
+    order: 0
+  - id: algo
+    name: 经典算法
+    order: 1
+  - id: analysis
+    name: 复杂度与权衡
+    order: 2
+
+knowledge_points:
+  # ---- 数据结构基础 ----
+  - id: ds.array
+    name: 数组与双指针
+    summary: 连续内存、O(1) 随机访问;双指针用于有序数组/原地操作。
+    type: concept
+    module_id: ds
+    tags: [array, two_pointers]
+
+  - id: ds.string
+    name: 字符串处理
+    summary: 字符编码、滑动窗口、字符串匹配基础。
+    type: concept
+    module_id: ds
+    prerequisites: [ds.array]
+    tags: [string, sliding_window]
+
+  - id: ds.hashtable
+    name: 哈希表
+    summary: O(1) 平均查找;空间换时间的核心工具。
+    type: concept
+    module_id: ds
+    tags: [hashmap]
+
+  - id: ds.linkedlist
+    name: 链表
+    summary: 单/双向链表,指针操作、反转、快慢指针。
+    type: procedure
+    module_id: ds
+    tags: [linked_list]
+
+  - id: ds.stack_queue
+    name: 栈与队列
+    summary: LIFO/FIFO;单调栈、双端队列在滑动窗口中的应用。
+    type: concept
+    module_id: ds
+    prerequisites: [ds.array]
+    tags: [stack, queue, monotonic]
+
+  - id: ds.tree
+    name: 二叉树与遍历
+    summary: 前/中/后/层序遍历;递归思维的基础。
+    type: concept
+    module_id: ds
+    tags: [tree, recursion]
+
+  - id: ds.bst
+    name: 二叉搜索树
+    summary: 有序性;搜索/插入/删除;中序遍历得有序序列。
+    type: concept
+    module_id: ds
+    prerequisites: [ds.tree]
+    tags: [bst]
+
+  - id: ds.heap
+    name: 堆与优先队列
+    summary: 完全二叉树;Top-K、合并有序流的核心结构。
+    type: procedure
+    module_id: ds
+    prerequisites: [ds.tree]
+    tags: [heap, priority_queue]
+
+  - id: ds.graph
+    name: 图的表示与遍历
+    summary: 邻接表/矩阵;BFS/DFS;连通分量。
+    type: concept
+    module_id: ds
+    prerequisites: [ds.tree, ds.hashtable]
+    tags: [graph, bfs, dfs]
+
+  # ---- 经典算法 ----
+  - id: algo.sort
+    name: 排序算法
+    summary: 快排/归并/堆排;稳定性与时空权衡。
+    type: procedure
+    module_id: algo
+    prerequisites: [ds.array, ds.heap]
+    tags: [sorting, divide_conquer]
+
+  - id: algo.search
+    name: 二分查找
+    summary: 有序搜索与边界条件;在旋转数组/答案空间上的应用。
+    type: procedure
+    module_id: algo
+    prerequisites: [ds.array]
+    tags: [binary_search]
+
+  - id: algo.recursion
+    name: 递归与分治
+    summary: 子问题分解;主定理;递归树分析。
+    type: concept
+    module_id: algo
+    prerequisites: [ds.tree]
+    tags: [recursion, divide_conquer]
+
+  - id: algo.dp
+    name: 动态规划
+    summary: 状态定义与转移;背包/区间/树形/状压 DP。
+    type: design
+    module_id: algo
+    prerequisites: [algo.recursion, ds.array]
+    tags: [dp]
+
+  - id: algo.dp_knapsack
+    name: 0-1 背包 DP
+    summary: 经典 0-1 背包模型及其变体(子集和、分割等和子集)。
+    type: procedure
+    module_id: algo
+    prerequisites: [algo.dp]
+    tags: [dp, knapsack]
+
+  - id: algo.greedy
+    name: 贪心算法
+    summary: 局部最优策略;与 DP 的边界;正确性证明思路。
+    type: design
+    module_id: algo
+    prerequisites: [algo.sort]
+    tags: [greedy]
+
+  - id: algo.graph_algo
+    name: 图算法
+    summary: 最短路(Dijkstra/Floyd)、并查集、拓扑排序、最小生成树。
+    type: design
+    module_id: algo
+    prerequisites: [ds.graph, ds.heap]
+    tags: [graph_algo, union_find]
+
+  - id: algo.backtrack
+    name: 回溯与剪枝
+    summary: 全排列/组合/子集;N 皇后;剪枝优化。
+    type: procedure
+    module_id: algo
+    prerequisites: [algo.recursion]
+    tags: [backtracking]
+
+  # ---- 复杂度与权衡 ----
+  - id: analysis.big_o
+    name: 渐近复杂度
+    summary: O/Θ/Ω 记号;常见复杂度阶排序。
+    type: concept
+    module_id: analysis
+    tags: [complexity]
+
+  - id: analysis.tradeoff
+    name: 时空权衡
+    summary: 哈希换时间、预处理换查询;工程取舍。
+    type: concept
+    module_id: analysis
+    prerequisites: [analysis.big_o, ds.hashtable]
+    tags: [tradeoff]
+
+  - id: analysis.amortized
+    name: 均摊分析
+    summary: 动态数组扩容、并查集路径压缩的均摊代价。
+    type: concept
+    module_id: analysis
+    prerequisites: [analysis.big_o, algo.graph_algo]
+    tags: [amortized]
