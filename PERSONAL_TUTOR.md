@@ -127,8 +127,8 @@ appreciation, narratology, writing, economics.
 | Phase | Scope | Status |
 |-------|-------|--------|
 | **0 — Infrastructure** | Env, plugin injection, domain framework, REST, programming seed domain | ✅ Done |
-| **1 — Diagnostic + profile** | Entry diagnostic capability, BKT knowledge tracing, profile builder | ⏳ Next |
-| **2 — Roadmap + FSRS** | Personalized Mastery Path generation, FSRS-4.5 scheduler | ☐ Planned |
+| **1 — Diagnostic + profile** | Entry diagnostic capability, BKT knowledge tracing, profile builder | ✅ Done |
+| **2 — Roadmap + FSRS** | Personalized roadmap generation, FSRS-4.5 scheduler, Mastery Path sync | ✅ Done |
 | **3 — Quiz + exam** | Adaptive quiz (BKT-driven), timed exam engine, score reports | ☐ Planned |
 | **4 — Frontend** | Next.js dashboard: profile, roadmap, review queue, exam | ☐ Scaffold |
 

@@ -15,6 +15,10 @@ Endpoints
 * ``POST /api/v1/personal/diagnostics/{id}/start``         — prepare diagnostic questions
 * ``POST /api/v1/personal/diagnostics/{id}/grade``         — grade answers, update BKT + profile
 * ``GET  /api/v1/personal/weakness/{domain_id}``           — lowest-mastery knowledge points
+* ``GET  /api/v1/personal/review/{domain_id}/queue``       — FSRS due-review queue
+* ``POST /api/v1/personal/review/{domain_id}/submit``      — record reviews, reschedule (FSRS+BKT)
+* ``POST /api/v1/personal/roadmaps/{domain_id}/generate``  — generate personalized roadmap
+* ``GET  /api/v1/personal/roadmaps/{domain_id}``           — read stored roadmap
 """
 
 from __future__ import annotations
@@ -30,10 +34,16 @@ from personal_tutor.capabilities.diagnostic.diagnostic import (
     grade_diagnostic,
     prepare_diagnostic,
 )
+from personal_tutor.capabilities.roadmap_planner.planner import (
+    load_roadmap,
+    plan_roadmap,
+)
 from personal_tutor.domains import get_registry
 from personal_tutor.learning import DEFAULT_KT_PARAMS, KnowledgeTracer
+from personal_tutor.learning.fsrs_scheduler import Grade
 from personal_tutor.learning.kt_store import KTStore
 from personal_tutor.learning.profile_builder import build_profile, write_profile
+from personal_tutor.learning.review_store import ReviewStore
 from personal_tutor.storage import json_store
 from personal_tutor.storage.paths import diagnostic_path, profile_path
 
@@ -259,6 +269,125 @@ async def rebuild_profile(domain_id: str) -> dict[str, Any]:
     store = KTStore(domain_id)
     tracer = KnowledgeTracer(DEFAULT_KT_PARAMS)
     return write_profile(domain_id, store, tracer, note="Rebuilt via API")
+
+
+# --------------------------------------------------------------------------- #
+# Review queue (FSRS)
+# --------------------------------------------------------------------------- #
+
+@router.get("/review/{domain_id}/queue")
+async def get_review_queue(domain_id: str, limit: int = 20) -> dict[str, Any]:
+    """Return the FSRS due-review queue for a domain.
+
+    Sorted by (due_at, retrievability) — most overdue / most forgotten first.
+    Each item carries KP metadata so the frontend can render a review screen.
+    """
+    _require_domain(domain_id)
+    store = ReviewStore(domain_id)
+    due = store.due(limit=limit)
+    return {"domain_id": domain_id, "due_count": len(due), "items": due}
+
+
+class ReviewSubmission(BaseModel):
+    """One FSRS review result. ``grade`` is 1=Again 2=Hard 3=Good 4=Easy."""
+
+    knowledge_point_id: str
+    grade: int = Field(ge=1, le=4, description="1=Again, 2=Hard, 3=Good, 4=Easy")
+    # Optional: also record into BKT (correctness derived from grade).
+    update_bkt: bool = True
+
+
+class ReviewBatch(BaseModel):
+    reviews: list[ReviewSubmission]
+    sync_mastery_path: bool = False
+
+
+@router.post("/review/{domain_id}/submit")
+async def submit_reviews(domain_id: str, body: ReviewBatch) -> dict[str, Any]:
+    """Record FSRS reviews and reschedule.
+
+    Applies each grade through the FSRS scheduler, persists the new intervals,
+    optionally mirrors them into BKT state + DeepTutor's Mastery Path
+    review_queue (so the upstream /learning dashboard stays in sync).
+    """
+    _require_domain(domain_id)
+    store = ReviewStore(domain_id)
+
+    # Apply FSRS updates.
+    fsrs_states = store.get_all()
+    bkt_outcomes: dict[str, bool] = {}
+    for r in body.reviews:
+        st = fsrs_states.get(r.knowledge_point_id)
+        if st is None:
+            st = store.get(r.knowledge_point_id)
+            fsrs_states[r.knowledge_point_id] = st
+        store.scheduler.review(st, Grade(r.grade))
+        if r.update_bkt:
+            # Again(1)/Hard(2) count as "incorrect" for BKT; Good/Easy as correct.
+            bkt_outcomes[r.knowledge_point_id] = r.grade >= 3
+    store.save()
+
+    # Optionally also update BKT (keeps mastery in lockstep with recall).
+    bkt_summary = None
+    if bkt_outcomes:
+        from personal_tutor.learning.kt_store import KTStore
+
+        kt = KTStore(domain_id)
+        tracer = KnowledgeTracer(DEFAULT_KT_PARAMS)
+        states = kt.get_all()
+        tracer.update_many(states, bkt_outcomes)
+        kt.upsert_many(states.values())
+        kt.save()
+        bkt_summary = "updated"
+
+    synced = False
+    if body.sync_mastery_path:
+        synced = store.sync_to_mastery_path()
+
+    due = store.due(limit=20)
+    return {
+        "ok": True,
+        "domain_id": domain_id,
+        "processed": len(body.reviews),
+        "bkt": bkt_summary,
+        "mastery_path_synced": synced,
+        "remaining_due": len(due),
+    }
+
+
+# --------------------------------------------------------------------------- #
+# Roadmap
+# --------------------------------------------------------------------------- #
+
+class RoadmapRequest(BaseModel):
+    goal: str | None = None
+    max_objectives: int = Field(default=50, ge=1, le=200)
+
+
+@router.post("/roadmaps/{domain_id}/generate")
+async def generate_roadmap(domain_id: str, body: RoadmapRequest | None = None) -> dict[str, Any]:
+    """Generate (or regenerate) a personalized roadmap from the current profile.
+
+    Reads BKT mastery, respects the knowledge-graph topology, and front-loads
+    weak points. Persists to ``roadmap_<domain>.json``.
+    """
+    _require_domain(domain_id)
+    goal = body.goal if body else None
+    max_obj = body.max_objectives if body else 50
+    return plan_roadmap(domain_id, goal=goal, max_objectives=max_obj)
+
+
+@router.get("/roadmaps/{domain_id}")
+async def get_roadmap(domain_id: str) -> dict[str, Any]:
+    """Return the stored roadmap (404 if not yet generated)."""
+    _require_domain(domain_id)
+    rm = load_roadmap(domain_id)
+    if rm is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No roadmap for {domain_id!r}. POST /roadmaps/{domain_id}/generate first.",
+        )
+    return rm
 
 
 __all__ = ["router"]

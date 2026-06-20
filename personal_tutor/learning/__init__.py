@@ -14,16 +14,28 @@ own ``deeptutor/learning/`` package but implements stronger models:
 Future phases add :mod:`fsrs_scheduler` (Phase 2) here.
 """
 
+from .fsrs_scheduler import (
+    DEFAULT_FSRS_WEIGHTS,
+    FSRSState,
+    FSRSScheduler,
+    Grade,
+)
 from .knowledge_tracing import (
     DEFAULT_KT_PARAMS,
     KTParams,
     KTState,
     KnowledgeTracer,
 )
+from .review_store import ReviewStore
 
 __all__ = [
+    "DEFAULT_FSRS_WEIGHTS",
     "DEFAULT_KT_PARAMS",
+    "FSRSState",
+    "FSRSScheduler",
+    "Grade",
     "KTParams",
     "KTState",
     "KnowledgeTracer",
+    "ReviewStore",
 ]
