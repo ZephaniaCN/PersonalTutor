@@ -1,10 +1,20 @@
 """PersonalTutor REST router.
 
-Phase-0 scope: enough surface area to drive the Next.js frontend (domains,
-knowledge graph, profile read/write, diagnostic start) without depending on
-the not-yet-built BKT engine or FSRS scheduler. Each endpoint is a thin facade
-over :mod:`personal_tutor.domains` and :mod:`personal_tutor.storage` so the
-real logic stays testable without HTTP.
+Thin facade over :mod:`personal_tutor.domains`, :mod:`personal_tutor.learning`,
+and :mod:`personal_tutor.capabilities.diagnostic` so the real logic stays
+testable without HTTP.
+
+Endpoints
+---------
+* ``GET  /api/v1/personal/health``                         — liveness + version
+* ``GET  /api/v1/personal/domains``                        — list registered domains
+* ``GET  /api/v1/personal/domains/{id}``                   — domain knowledge graph
+* ``GET  /api/v1/personal/profile/{domain_id}``            — read learning profile
+* ``PUT  /api/v1/personal/profile/{domain_id}``            — write learning profile
+* ``POST /api/v1/personal/profile/{domain_id}/rebuild``    — recompute profile from BKT
+* ``POST /api/v1/personal/diagnostics/{id}/start``         — prepare diagnostic questions
+* ``POST /api/v1/personal/diagnostics/{id}/grade``         — grade answers, update BKT + profile
+* ``GET  /api/v1/personal/weakness/{domain_id}``           — lowest-mastery knowledge points
 """
 
 from __future__ import annotations
@@ -16,7 +26,14 @@ from pydantic import BaseModel, Field
 
 from personal_tutor import __version__ as pt_version
 from personal_tutor import MIN_DEEPTUTOR_VERSION
+from personal_tutor.capabilities.diagnostic.diagnostic import (
+    grade_diagnostic,
+    prepare_diagnostic,
+)
 from personal_tutor.domains import get_registry
+from personal_tutor.learning import DEFAULT_KT_PARAMS, KnowledgeTracer
+from personal_tutor.learning.kt_store import KTStore
+from personal_tutor.learning.profile_builder import build_profile, write_profile
 from personal_tutor.storage import json_store
 from personal_tutor.storage.paths import diagnostic_path, profile_path
 
@@ -150,39 +167,98 @@ async def put_profile(domain_id: str, body: ProfileUpdate) -> dict[str, Any]:
 async def start_diagnostic(domain_id: str) -> dict[str, Any]:
     """Start an entry diagnostic for a domain.
 
-    Phase 0 returns the blueprint and the sampled knowledge-point plan (which
-    KPs will be tested). Actual question generation + grading lands with the
-    diagnostic capability in phase 2; this endpoint gives the frontend
-    something to render a "diagnostic setup" screen immediately.
+    Samples the knowledge graph per the domain's blueprint, generates one
+    question per sampled KP (placeholder generator today, LLM-backed once a
+    model is configured), and returns the full question set. Each question
+    carries an ``expected_answer`` for deterministic grading.
+
+    Submit answers with :meth:`grade_diagnostic_answers`.
+    """
+    _require_domain(domain_id)
+    return await prepare_diagnostic(domain_id)
+
+
+class AnswerItem(BaseModel):
+    """One graded answer from the client.
+
+    ``is_correct`` is computed client-side (against expected_answer, or via an
+    LLM grade for open questions) — same convention as DeepTutor's quiz-results.
+    """
+
+    knowledge_point_id: str
+    is_correct: bool
+    question_id: str | None = None
+    user_answer: str | None = None
+
+
+class GradeRequest(BaseModel):
+    answers: list[AnswerItem]
+    diagnostic_id: str | None = None
+
+
+@router.post("/diagnostics/{domain_id}/grade")
+async def grade_diagnostic_answers(
+    domain_id: str, body: GradeRequest
+) -> dict[str, Any]:
+    """Grade diagnostic answers, update BKT state, and rebuild the profile.
+
+    Returns the score, updated profile summary, and top weak points so the
+    client can render the baseline report in one round trip.
+    """
+    _require_domain(domain_id)
+    return grade_diagnostic(
+        domain_id,
+        [a.model_dump() for a in body.answers],
+        diagnostic_id=body.diagnostic_id,
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Weakness / profile queries
+# --------------------------------------------------------------------------- #
+
+@router.get("/weakness/{domain_id}")
+async def get_weakness(domain_id: str, limit: int = 10) -> dict[str, Any]:
+    """Return the lowest-mastery knowledge points for a domain.
+
+    Reads the current BKT state and scores every KP in the domain's graph
+    (unseen KPs count as the prior). Useful for "what should I study next".
     """
     spec = _require_domain(domain_id)
-    bp = spec.diagnostic_blueprint()
     graph = spec.knowledge_graph()
+    store = KTStore(domain_id)
+    tracer = KnowledgeTracer(DEFAULT_KT_PARAMS)
+    states = store.get_all()
 
-    # Sample: take the must-include KPs plus ``questions_per_module`` per module.
-    plan: list[dict[str, Any]] = []
-    for must in bp.must_include:
-        kp = graph.get(must)
-        if kp:
-            plan.append({"knowledge_point_id": kp.id, "name": kp.name})
-    for module_id in graph.module_order:
-        kps = [graph.get(k) for k in graph.modules.get(module_id, []) if graph.get(k)]
-        for kp in kps[: bp.questions_per_module]:
-            if kp and all(p["knowledge_point_id"] != kp.id for p in plan):
-                plan.append({"knowledge_point_id": kp.id, "name": kp.name})
+    scored: list[dict[str, Any]] = []
+    for kp in graph.all_points():
+        st = states.get(kp.id)
+        mastery = tracer.mastery_of(st, kp.id)
+        scored.append(
+            {
+                "knowledge_point_id": kp.id,
+                "name": kp.name,
+                "module_id": kp.module_id,
+                "mastery": round(mastery, 4),
+                "attempts": st.attempts if st else 0,
+                "correct": st.correct if st else 0,
+            }
+        )
+    scored.sort(key=lambda r: (r["mastery"], -r["attempts"]))
+    return {"domain_id": domain_id, "weak_points": scored[:limit], "total": len(scored)}
 
-    result = {
-        "domain_id": domain_id,
-        "blueprint": {
-            "questions_per_module": bp.questions_per_module,
-            "default_difficulty": bp.default_difficulty.value,
-            "must_include": list(bp.must_include),
-        },
-        "question_plan": plan,
-        "total_questions": len(plan),
-    }
-    json_store.write_json(diagnostic_path(domain_id), result)
-    return result
+
+@router.post("/profile/{domain_id}/rebuild")
+async def rebuild_profile(domain_id: str) -> dict[str, Any]:
+    """Recompute and persist the profile from current BKT state.
+
+    Call this after any out-of-band BKT update (e.g. practice answers recorded
+    directly) to refresh the profile + Memory L3 mirror.
+    """
+    _require_domain(domain_id)
+    store = KTStore(domain_id)
+    tracer = KnowledgeTracer(DEFAULT_KT_PARAMS)
+    return write_profile(domain_id, store, tracer, note="Rebuilt via API")
 
 
 __all__ = ["router"]

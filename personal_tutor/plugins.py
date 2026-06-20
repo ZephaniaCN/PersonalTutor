@@ -144,6 +144,20 @@ def _install_defaults() -> None:
             stages=("responding",),
         )
     )
+    register_capability(
+        PersonalCapabilitySpec(
+            name="personal_diagnostic",
+            description=(
+                "PersonalTutor entry diagnostic. Samples a domain's knowledge "
+                "graph, generates one question per sampled knowledge point, "
+                "and emits the question set. Submit answers via the "
+                "POST /api/v1/personal/diagnostics/{domain_id}/grade endpoint "
+                "to update the BKT-based learner profile."
+            ),
+            entry="personal_tutor.capabilities.diagnostic.capability:DiagnosticCapability",
+            stages=("preparing", "responding"),
+        )
+    )
 
 
 _install_defaults()

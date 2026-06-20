@@ -94,6 +94,11 @@ class ProgrammingQuestionGenerator(QuestionGenerator):
                         + f"(难度: {difficulty.value})"
                     ),
                     "difficulty": difficulty.value,
+                    # Both keys present so callers can use whichever convention
+                    # they prefer: `expected_answer` is the PersonalTutor
+                    # diagnostic contract; `correct_answer` mirrors DeepTutor's
+                    # Question Bank shape for direct persistence.
+                    "expected_answer": kp.summary or kp.name,
                     "correct_answer": kp.summary or kp.name,
                     "explanation": (
                         "参考答案应覆盖核心定义、典型应用与常见陷阱。"

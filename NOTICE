@@ -1,0 +1,13 @@
+PersonalTutor
+Copyright 2026 PersonalTutor contributors
+
+This product includes software developed by the HKUDS Group
+(https://github.com/HKUDS) as part of the DeepTutor project
+(https://github.com/HKUDS/DeepTutor), licensed under the Apache License,
+Version 2.0.
+
+PersonalTutor is an extension layer built on top of DeepTutor. The upstream
+DeepTutor source tree is preserved in the `deeptutor/` and `deeptutor_cli/`
+packages and is intentionally kept in sync with upstream via `git rebase`.
+All modifications to the upstream tree are isolated in the `patches/`
+directory; the bulk of PersonalTutor's own code lives under `personal_tutor/`.
