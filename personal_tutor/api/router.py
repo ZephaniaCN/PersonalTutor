@@ -19,10 +19,16 @@ Endpoints
 * ``POST /api/v1/personal/review/{domain_id}/submit``      — record reviews, reschedule (FSRS+BKT)
 * ``POST /api/v1/personal/roadmaps/{domain_id}/generate``  — generate personalized roadmap
 * ``GET  /api/v1/personal/roadmaps/{domain_id}``           — read stored roadmap
+* ``POST /api/v1/personal/quiz/{domain_id}/next``          — fetch next adaptive question
+* ``POST /api/v1/personal/quiz/{domain_id}/grade``         — grade one answer, update BKT+FSRS
+* ``POST /api/v1/personal/exams/{domain_id}/start``        — open a timed one-shot exam
+* ``POST /api/v1/personal/exams/{exam_id}/submit``         — submit all answers, get report
+* ``GET  /api/v1/personal/exams/{exam_id}/report``         — read exam record / report
 """
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
@@ -30,6 +36,7 @@ from pydantic import BaseModel, Field
 
 from personal_tutor import __version__ as pt_version
 from personal_tutor import MIN_DEEPTUTOR_VERSION
+from personal_tutor.capabilities.adaptive_quiz.quiz import grade_one, next_question
 from personal_tutor.capabilities.diagnostic.diagnostic import (
     grade_diagnostic,
     prepare_diagnostic,
@@ -45,6 +52,7 @@ from personal_tutor.learning.kt_store import KTStore
 from personal_tutor.learning.profile_builder import build_profile, write_profile
 from personal_tutor.learning.review_store import ReviewStore
 from personal_tutor.storage import json_store
+from personal_tutor.storage.exam_store import get_exam_report, start_exam, submit_exam
 from personal_tutor.storage.paths import diagnostic_path, profile_path
 
 router = APIRouter()
@@ -388,6 +396,111 @@ async def get_roadmap(domain_id: str) -> dict[str, Any]:
             detail=f"No roadmap for {domain_id!r}. POST /roadmaps/{domain_id}/generate first.",
         )
     return rm
+
+
+# --------------------------------------------------------------------------- #
+# Adaptive quiz
+# --------------------------------------------------------------------------- #
+
+class QuizNextRequest(BaseModel):
+    exclude: list[str] = Field(default_factory=list)
+
+
+@router.post("/quiz/{domain_id}/next")
+async def quiz_next(domain_id: str, body: QuizNextRequest | None = None) -> dict[str, Any]:
+    """Fetch the next adaptive question (weakest KP, mastery-scaled difficulty)."""
+    _require_domain(domain_id)
+    exclude = body.exclude if body else []
+    return await next_question(domain_id, exclude=exclude)
+
+
+class QuizGradeRequest(BaseModel):
+    knowledge_point_id: str
+    user_answer: str
+    question: dict[str, Any] | None = None
+    threshold: float = Field(default=0.7, ge=0.0, le=1.0)
+
+
+@router.post("/quiz/{domain_id}/grade")
+async def quiz_grade(domain_id: str, body: QuizGradeRequest) -> dict[str, Any]:
+    """Grade one adaptive answer; updates BKT + FSRS + profile."""
+    _require_domain(domain_id)
+    return await grade_one(
+        domain_id,
+        knowledge_point_id=body.knowledge_point_id,
+        user_answer=body.user_answer,
+        question=body.question,
+        threshold=body.threshold,
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Exam engine
+# --------------------------------------------------------------------------- #
+
+class ExamStartRequest(BaseModel):
+    num_questions: int = Field(default=10, ge=1, le=50)
+    duration_minutes: int = Field(default=30, ge=1, le=240)
+    difficulty: str | None = None
+    title: str | None = None
+
+
+class ExamAnswerItem(BaseModel):
+    knowledge_point_id: str
+    user_answer: str
+
+
+class ExamSubmitRequest(BaseModel):
+    answers: list[ExamAnswerItem]
+    threshold: float = Field(default=0.7, ge=0.0, le=1.0)
+
+
+@router.post("/exams/{domain_id}/start")
+async def exams_start(domain_id: str, body: ExamStartRequest | None = None) -> dict[str, Any]:
+    """Open a new formal exam (timed, one-shot). Returns the paper without answers."""
+    _require_domain(domain_id)
+    kwargs = body.model_dump() if body else {}
+    record = await start_exam(domain_id, **kwargs)
+    # Strip expected answers from the client-facing paper view.
+    paper_questions = [
+        {k: v for k, v in q.items() if k not in ("expected_answer", "correct_answer")}
+        for q in record["questions"]
+    ]
+    return {
+        "exam_id": record["exam_id"],
+        "domain_id": record["domain_id"],
+        "title": record["title"],
+        "status": record["status"],
+        "started_at_iso": record["started_at_iso"],
+        "deadline_iso": datetime.fromtimestamp(record["deadline"], tz=timezone.utc).isoformat(timespec="seconds"),
+        "duration_minutes": record["duration_minutes"],
+        "num_questions": record["num_questions"],
+        "questions": paper_questions,
+    }
+
+
+@router.post("/exams/{exam_id}/submit")
+async def exams_submit(exam_id: str, body: ExamSubmitRequest) -> dict[str, Any]:
+    """Submit all exam answers at once; produces the score report."""
+    try:
+        return await submit_exam(
+            exam_id,
+            [a.model_dump() for a in body.answers],
+            threshold=body.threshold,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+
+
+@router.get("/exams/{exam_id}/report")
+async def exams_report(exam_id: str) -> dict[str, Any]:
+    """Return the exam record (the graded report, or the open paper)."""
+    try:
+        return get_exam_report(exam_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
 
 __all__ = ["router"]

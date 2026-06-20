@@ -4,8 +4,8 @@
 
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![DeepTutor](https://img.shields.io/badge/built%20on-DeepTutor-4f9cf9)](https://github.com/HKUDS/DeepTutor)
-[![Phase](https://img.shields.io/badge/phase-2%20(FSRS%20+%20roadmap)-orange)](#roadmap)
-[![Tests](https://img.shields.io/badge/tests-53%20passing-brightgreen)](#)
+[![Phase](https://img.shields.io/badge/phase-3%20(quiz%20+%20exam)-orange)](#roadmap)
+[![Tests](https://img.shields.io/badge/tests-62%20passing-brightgreen)](#)
 
 PersonalTutor 在**完全不改 DeepTutor 业务代码**的前提下,叠加了个人成长所需的四件事:精细的**弱点追踪**、个性化的**学习路线图**、自适应的**测试与复习**、可扩展的**学习领域**。它通过 DeepTutor 预留的插件接口被自动发现,上游每次更新都能干净地 rebase 进来。
 
@@ -27,7 +27,8 @@ DeepTutor 是优秀的通用导师,但一个真正驱动个人成长的系统还
 | 精细弱点追踪 | Memory L3 `profile`(软命题) | 逐知识点的 **BKT** 贝叶斯追踪 ✅ |
 | 精准复习调度 | Mastery Path 固定间隔 | **FSRS-4.5** 卡片级调度 ✅ |
 | 个性化学习路线 | 硬编码 capability | **弱点优先 + 拓扑排序**路线图 ✅ |
-| 正式评估 | `deep_question`(练习导向) | 限时**考试引擎** + 成绩单 *(Phase 3)* |
+| 正式评估 | `deep_question`(练习导向) | 限时**考试引擎** + 成绩单 ✅ |
+| 自适应出题 | 固定难度 | **BKT 驱动**弱点选题 + 动态难度 ✅ |
 | 新增学习领域 | 硬编码 capability | **领域插件注册表**(加领域不改代码) ✅ |
 
 ---
@@ -114,7 +115,7 @@ cd frontend && npm install && npm run build && npm run start
 | **0 — 基础设施** | 环境、插件注入、领域框架、REST、编程种子领域、前端骨架 | ✅ 完成 |
 | **1 — 诊断 + 档案** | 入门诊断能力、BKT 知识追踪、档案构建器 | ✅ 完成 |
 | **2 — 路线图 + FSRS** | 个性化路线图生成、FSRS-4.5 调度器、Mastery Path 同步 | ✅ 完成 |
-| **3 — 出题 + 考试** | BKT 驱动的自适应出题、限时考试引擎、成绩单 | ☐ 规划 |
+| **3 — 出题 + 考试** | BKT 驱动的自适应出题、限时考试引擎、LLM 判分、成绩单 | ✅ 完成 |
 | **4 — 前端** | 仪表板:档案 / 路线图 / 复习队列 / 考试 | ☐ 规划 |
 
 ---

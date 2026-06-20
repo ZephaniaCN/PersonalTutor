@@ -158,6 +158,19 @@ def _install_defaults() -> None:
             stages=("preparing", "responding"),
         )
     )
+    register_capability(
+        PersonalCapabilitySpec(
+            name="personal_quiz",
+            description=(
+                "PersonalTutor adaptive quiz. Picks the learner's weakest "
+                "knowledge point, scales difficulty to current mastery, and "
+                "emits one question. Grade via "
+                "POST /api/v1/personal/quiz/{domain_id}/grade to update BKT."
+            ),
+            entry="personal_tutor.capabilities.adaptive_quiz.capability:AdaptiveQuizCapability",
+            stages=("selecting", "responding"),
+        )
+    )
 
 
 _install_defaults()
