@@ -1,5 +1,4 @@
-import { api } from "@/lib/api";
-import type { DomainSummary, HealthResponse } from "@/lib/api";
+import { api, type DomainSummary, type HealthResponse } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
@@ -17,9 +16,7 @@ export default async function Home() {
   return (
     <main className="container">
       <h1>PersonalTutor</h1>
-      <p className="subtitle">
-        基于 DeepTutor 的个性化学习导师系统
-      </p>
+      <p className="subtitle">基于 DeepTutor 的个性化学习导师系统</p>
 
       {error ? (
         <div className="panel error">
@@ -30,9 +27,7 @@ export default async function Home() {
         </div>
       ) : health ? (
         <div className="panel">
-          <span className={`badge ${health.ok ? "ok" : ""}`}>
-            {health.ok ? "在线" : "异常"}
-          </span>
+          <span className={`badge ${health.ok ? "ok" : ""}`}>{health.ok ? "在线" : "异常"}</span>
           <span className="badge">PersonalTutor v{health.personal_tutor_version}</span>
           <span className="badge">DeepTutor ≥ {health.min_deeptutor_version}</span>
         </div>
@@ -51,7 +46,7 @@ export default async function Home() {
               </div>
             </div>
             <form action={`/domains/${d.domain_id}`} style={{ margin: 0 }}>
-              <button type="submit">进入</button>
+              <button type="submit">进入 →</button>
             </form>
           </div>
         ))

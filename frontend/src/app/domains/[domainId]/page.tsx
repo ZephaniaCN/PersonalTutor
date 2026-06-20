@@ -1,75 +1,106 @@
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { MasteryBar } from "@/components/MasteryBar";
 
 export const dynamic = "force-dynamic";
 
-export default async function DomainPage({
+export default async function DomainOverview({
   params,
 }: {
   params: Promise<{ domainId: string }>;
 }) {
   const { domainId } = await params;
-  let graph;
-  let diagnostic;
+
+  let profile = null;
+  let weakness = null;
+  let graph = null;
   let error = "";
 
   try {
-    graph = await api.getDomain(domainId);
-    diagnostic = await api.startDiagnostic(domainId);
+    [profile, weakness, graph] = await Promise.all([
+      api.getProfile(domainId),
+      api.getWeakness(domainId, 5),
+      api.getDomain(domainId),
+    ]);
   } catch (e) {
     error = e instanceof Error ? e.message : String(e);
   }
 
-  if (error) {
+  if (error || !profile || !graph) {
     return (
-      <main className="container">
-        <Link href="/" className="muted">
-          ← 返回
-        </Link>
-        <div className="panel error">
-          <strong>加载领域失败。</strong>
-          <br />
-          <small>{error}</small>
-        </div>
-      </main>
+      <div className="panel error">
+        <strong>无法加载领域数据。</strong>请确认后端已启动(<code>deeptutor serve</code>)。
+        <br />
+        <small>{error}</small>
+      </div>
     );
   }
 
-  if (!graph || !diagnostic) return null;
-
-  // Group knowledge points by module for display.
+  const s = profile.summary;
   const byModule = new Map<string, typeof graph.knowledge_points>();
   for (const kp of graph.knowledge_points) {
     const list = byModule.get(kp.module_id) ?? [];
     list.push(kp);
     byModule.set(kp.module_id, list);
   }
+  const masteryById = new Map(profile.knowledge_points.map((r) => [r.knowledge_point_id, r.mastery]));
 
   return (
-    <main className="container">
-      <Link href="/" className="muted">
-        ← 返回领域列表
-      </Link>
-
-      <h1>{graph.name}</h1>
-      <p className="subtitle">{graph.description}</p>
-
-      <h2>入门诊断</h2>
-      <div className="panel">
-        <div>
-          <span className="badge">题目数 {diagnostic.total_questions}</span>
-          <span className="badge">
-            默认难度 {diagnostic.blueprint.default_difficulty}
-          </span>
-          <span className="badge">
-            每模块 {diagnostic.blueprint.questions_per_module} 题
-          </span>
+    <>
+      {s.assessed === 0 ? (
+        <div className="panel">
+          <div className="domain-name">尚未建立学习档案</div>
+          <p className="muted">
+            完成一次入门诊断,系统将评估你在各知识点的水平,并据此规划个性化学习路线。
+          </p>
+          <form action={`/domains/${domainId}/diagnostic`} style={{ marginTop: 12 }}>
+            <button type="submit">开始入门诊断 →</button>
+          </form>
         </div>
-        <p className="muted" style={{ marginTop: 12 }}>
-          完成诊断后将建立你的能力基线,并据此规划个性化学习路线图。
-          (诊断执行能力将在 Phase 1 落地)
-        </p>
-      </div>
+      ) : (
+        <div className="panel">
+          <div className="domain-name">当前水平:{s.overall_level}</div>
+          <div className="stat-grid" style={{ marginTop: 12 }}>
+            <div className="stat">
+              <div className="stat-value">{Math.round(s.average_mastery * 100)}%</div>
+              <div className="stat-label">平均掌握度</div>
+            </div>
+            <div className="stat">
+              <div className="stat-value">{s.assessed}/{s.total_knowledge_points}</div>
+              <div className="stat-label">已评估知识点</div>
+            </div>
+            <div className="stat">
+              <div className="stat-value">{s.mastered}</div>
+              <div className="stat-label">已掌握(≥70%)</div>
+            </div>
+            <div className="stat">
+              <div className="stat-value">{Math.round(s.coverage * 100)}%</div>
+              <div className="stat-label">覆盖率</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {weakness && weakness.weak_points.length > 0 && (
+        <>
+          <h2>当前薄弱点</h2>
+          <div className="panel">
+            <ul className="clean">
+              {weakness.weak_points.map((w) => (
+                <li key={w.knowledge_point_id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <strong>{w.name}</strong>
+                    <span className="muted" style={{ marginLeft: 8 }}>
+                      {w.correct}/{w.attempts} 正确
+                    </span>
+                  </div>
+                  <MasteryBar mastery={w.mastery} />
+                </li>
+              ))}
+            </ul>
+          </div>
+        </>
+      )}
 
       <h2>知识图谱</h2>
       {graph.modules.map((m) => {
@@ -77,28 +108,31 @@ export default async function DomainPage({
         return (
           <div key={m.id} className="panel">
             <div className="domain-name">{m.name || m.id}</div>
-            <ul style={{ margin: "12px 0 0", paddingLeft: 20 }}>
-              {kps.map((kp) => (
-                <li key={kp.id}>
-                  <strong>{kp.name}</strong>{" "}
-                  <span className="muted">({kp.id})</span>
-                  {kp.prerequisites.length > 0 && (
-                    <span className="muted">
-                      {" "}
-                      · 依赖: {kp.prerequisites.join(", ")}
-                    </span>
-                  )}
-                  {kp.summary && (
-                    <div className="muted" style={{ fontSize: "0.9rem" }}>
-                      {kp.summary}
+            <ul className="clean" style={{ marginTop: 8 }}>
+              {kps.map((kp) => {
+                const mast = masteryById.get(kp.id);
+                return (
+                  <li key={kp.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16 }}>
+                    <div>
+                      <strong>{kp.name}</strong>
+                      {kp.prerequisites.length > 0 && (
+                        <span className="muted" style={{ marginLeft: 8 }}>
+                          依赖: {kp.prerequisites.join(", ")}
+                        </span>
+                      )}
                     </div>
-                  )}
-                </li>
-              ))}
+                    {mast !== undefined ? (
+                      <MasteryBar mastery={mast} />
+                    ) : (
+                      <span className="muted">未评估</span>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           </div>
         );
       })}
-    </main>
+    </>
   );
 }

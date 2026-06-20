@@ -4,7 +4,7 @@
 
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![DeepTutor](https://img.shields.io/badge/built%20on-DeepTutor-4f9cf9)](https://github.com/HKUDS/DeepTutor)
-[![Phase](https://img.shields.io/badge/phase-3%20(quiz%20+%20exam)-orange)](#roadmap)
+[![Phase](https://img.shields.io/badge/phase-4%20(frontend%20dashboard)-orange)](#roadmap)
 [![Tests](https://img.shields.io/badge/tests-62%20passing-brightgreen)](#)
 
 PersonalTutor 在**完全不改 DeepTutor 业务代码**的前提下,叠加了个人成长所需的四件事:精细的**弱点追踪**、个性化的**学习路线图**、自适应的**测试与复习**、可扩展的**学习领域**。它通过 DeepTutor 预留的插件接口被自动发现,上游每次更新都能干净地 rebase 进来。
@@ -116,7 +116,7 @@ cd frontend && npm install && npm run build && npm run start
 | **1 — 诊断 + 档案** | 入门诊断能力、BKT 知识追踪、档案构建器 | ✅ 完成 |
 | **2 — 路线图 + FSRS** | 个性化路线图生成、FSRS-4.5 调度器、Mastery Path 同步 | ✅ 完成 |
 | **3 — 出题 + 考试** | BKT 驱动的自适应出题、限时考试引擎、LLM 判分、成绩单 | ✅ 完成 |
-| **4 — 前端** | 仪表板:档案 / 路线图 / 复习队列 / 考试 | ☐ 规划 |
+| **4 — 前端** | 仪表板:概览 / 诊断 / 档案 / 路线图 / 练习 / 考试 | ✅ 完成 |
 
 ---
 

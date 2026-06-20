@@ -130,7 +130,7 @@ appreciation, narratology, writing, economics.
 | **1 — Diagnostic + profile** | Entry diagnostic capability, BKT knowledge tracing, profile builder | ✅ Done |
 | **2 — Roadmap + FSRS** | Personalized roadmap generation, FSRS-4.5 scheduler, Mastery Path sync | ✅ Done |
 | **3 — Quiz + exam** | Adaptive quiz (BKT-driven), timed exam engine, LLM grading, score reports | ✅ Done |
-| **4 — Frontend** | Next.js dashboard: profile, roadmap, review queue, exam | ☐ Scaffold |
+| **4 — Frontend** | Next.js dashboard: overview, diagnostic, profile, roadmap, practice, exam | ✅ Done |
 
 ---
 
